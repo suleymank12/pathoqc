@@ -1,0 +1,21 @@
+# Veri ve model dosyaları: büyük, yeniden üretilebilir, lisansı bize ait değil
+data/
+outputs/
+*.zip
+*.pt
+*.pth
+*.onnx
+
+# Gizli anahtarlar: asla depoya girmez
+kaggle.json
+access_token
+.kaggle/
+.env
+*.token
+
+# Python
+__pycache__/
+*.egg-info/
+.pytest_cache/
+.venv/
+.ipynb_checkpoints/
