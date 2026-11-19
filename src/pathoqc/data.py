@@ -107,12 +107,15 @@ def build_train_transform() -> transforms.Compose:
     )
 
 
-def build_eval_transform() -> transforms.Compose:
-    """Ölçüm dönüşümü: rastgelelik yok, yalnızca tensöre çevirme + normalizasyon."""
+def build_eval_transform(mean=IMAGENET_MEAN, std=IMAGENET_STD) -> transforms.Compose:
+    """Ölçüm dönüşümü: rastgelelik yok, yalnızca tensöre çevirme + normalizasyon.
+
+    Her omurga kendi eğitildiği renk ortalamasını ve sapmasını bekler; o yüzden parametredir.
+    """
     return transforms.Compose(
         [
             transforms.ToTensor(),
-            transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD),
+            transforms.Normalize(mean, std),
         ]
     )
 
@@ -157,13 +160,18 @@ class MaskDataset(Dataset):
     def __len__(self) -> int:
         return len(self.image_paths)
 
-    def __getitem__(self, index: int):
+    def read_mask(self, index: int) -> torch.Tensor:
+        """Yalnızca maskeyi okur: [Y, G], değerler 0-4."""
         path = self.image_paths[index]
-        with Image.open(path) as image:
-            image = self.transform(image.convert("RGB"))
         # Maskeler "paletli" PNG'dir: her piksel bir renk değil, sınıf numarası (0-4) tutar.
         with Image.open(self.mask_dir / path.name) as mask_image:
             mask = np.array(mask_image, dtype=np.int64)
         if mask.max() > IGNORE_INDEX:
             raise ValueError(f"Maskede beklenmeyen değer {mask.max()}: {path.name}")
-        return image, torch.from_numpy(mask), path.stem
+        return torch.from_numpy(mask)
+
+    def __getitem__(self, index: int):
+        path = self.image_paths[index]
+        with Image.open(path) as image:
+            image = self.transform(image.convert("RGB"))
+        return image, self.read_mask(index), path.stem

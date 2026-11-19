@@ -39,6 +39,26 @@ class CamClassifier(nn.Module):
         return logits, cams
 
 
+class CamHead(nn.Module):
+    """Dondurulmuş omurganın özellik haritası üstüne eğitilen küçük baş.
+
+    Girdi  [B, C, h, w]  önbellekten okunan özellikler
+    Çıktı  logits [B, 4] ve cams [B, 4, h, w]; CamClassifier ile aynı düzen.
+    """
+
+    def __init__(self, in_channels: int, num_classes: int = 4):
+        super().__init__()
+        # Her omurganın özellik ölçeği farklıdır. BatchNorm hepsini aynı ölçeğe getirir;
+        # böylece aynı öğrenme hızı bütün omurgalarda çalışır ve karşılaştırma adil olur.
+        self.norm = nn.BatchNorm2d(in_channels)
+        self.classifier = nn.Conv2d(in_channels, num_classes, kernel_size=1, bias=False)
+
+    def forward(self, features: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        cams = self.classifier(self.norm(features))
+        logits = cams.mean(dim=(2, 3))
+        return logits, cams
+
+
 def predict_present(logits: torch.Tensor, threshold: float = 0.5) -> torch.Tensor:
     """Skorlardan "yamada hangi sınıflar var" kararını üretir: [B, 4], değerler 0 ya da 1.
 
