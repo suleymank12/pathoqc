@@ -72,18 +72,25 @@ def predict_present(logits: torch.Tensor, threshold: float = 0.5) -> torch.Tenso
     return present
 
 
-def cams_to_mask(cams: torch.Tensor, present: torch.Tensor, size: tuple[int, int]) -> torch.Tensor:
+def cams_to_mask(
+    cams: torch.Tensor, present: torch.Tensor, size: tuple[int, int], normalize: bool = True
+) -> torch.Tensor:
     """Isı haritalarını maskeye çevirir: [B, Y, G], her piksel 0-3 arası bir sınıf.
 
-    1. Negatif değerler sıfırlanır (o sınıfa karşı kanıt, işimize yaramaz).
-    2. Harita yama boyutuna büyütülür.
-    3. Her sınıfın haritası kendi en büyük değerine bölünür ki sınıflar aynı ölçekte yarışsın.
-    4. Yamada olmayan sınıfların haritası sıfırlanır.
-    5. Her pikselde en yüksek haritaya sahip sınıf seçilir.
+    Harita önce yama boyutuna büyütülür, sonra her pikselde en yüksek skorlu sınıf seçilir.
+    Yamada olmayan sınıflar yarışa hiç giremez. Skorun nasıl hazırlandığı `normalize` ile seçilir:
+
+    normalize=True  (klasik CAM): negatifler sıfırlanır, her sınıfın haritası kendi en büyük
+                    değerine bölünür. Sınıflar aynı ölçekte yarışır; ama bir sınıfın haritası
+                    tek bir noktada sivrilmişse geri kalan her yerde zayıf görünür.
+    normalize=False (ham skor): başın verdiği skorlar olduğu gibi karşılaştırılır.
     """
-    cams = F.relu(cams)
     cams = F.interpolate(cams, size=size, mode="bilinear", align_corners=False)
-    peak = cams.amax(dim=(2, 3), keepdim=True).clamp_min(1e-5)
-    cams = cams / peak
-    cams = cams * present[:, :, None, None]
+    absent = present[:, :, None, None] == 0
+    if normalize:
+        cams = F.relu(cams)
+        peak = cams.amax(dim=(2, 3), keepdim=True).clamp_min(1e-5)
+        cams = (cams / peak).masked_fill(absent, 0.0)
+    else:
+        cams = cams.masked_fill(absent, float("-inf"))
     return cams.argmax(dim=1)

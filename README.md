@@ -22,6 +22,7 @@ Bu yazılım araştırma amaçlıdır. **Tanı koymaz**, klinik kararda kullanı
 | Omurga | LUAD-HistoSeg mIoU | BCSS-WSSS mIoU | Not |
 |---|---|---|---|
 | ResNet-50 (ImageNet, ince ayarlı) | 69,36 | 60,43 | tek seed (0), 10 epoch |
+| Midnight (dondurulmuş) + doğrusal baş, ilk ayar | 67,23 ± 1,04 | - | 3 seed; en iyi nokta 1. epoch'ta, eğitim uzadıkça %50'ye düştü |
 
 Test kümelerine henüz dokunulmadı.
 
@@ -40,7 +41,7 @@ Asıl hedef, yayımlanmış en yüksek sonuçların üstü: LUAD-HistoSeg'de %79
 | `src/pathoqc/backbones.py` | Dondurulmuş patoloji omurgalarının listesi ve sarmalayıcısı | Yeni omurga eklemek tek satır olsun |
 | `src/pathoqc/cache.py` | Özellikleri bir kez hesaplayıp diske yazan kod | Dev model her eğitimde yeniden çalışmasın |
 | `scripts/train_stage1.py` | Temel modeli (ResNet-50) eğiten betik | Kaggle ve Colab'da komutla çalıştırılır |
-| `scripts/train_stage1_frozen.py` | Dondurulmuş omurga ile eğiten betik (3 seed) | Omurga karşılaştırması bununla yapılır |
+| `scripts/train_stage1_frozen.py` | Dondurulmuş omurga ile eğiten betik: birkaç öğrenme hızını 3 seed ile dener, sık ölçer, en iyi ayarı seçer | Omurga karşılaştırması bununla yapılır |
 | `tests/` | Otomatik testler | Bir şeyi değiştirince bozulanı hemen görmek için |
 | `notebooks/` | Veriyi indiren iki not defteri | Colab ve Kaggle'da bir kez çalıştırıldı |
 | `docs/veri-setleri.md` | Veri setlerinin sayıları, sınıfları, kaynağı | Rakamlar kodun dışında da yazılı dursun |
