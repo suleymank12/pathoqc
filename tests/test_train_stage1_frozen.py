@@ -55,7 +55,7 @@ def test_sweep_selects_one_setting_for_all_seeds(tiny_dataset, tmp_path, tiny_ba
             for step in (2, 4, 5):
                 assert mean_at(lr, variant, step) <= selected["val_miou_mean"] + 0.01
 
-    run_dir = tmp_path / "out" / "luad_stage1_tiny"
+    run_dir = tmp_path / "out" / "luad_stage1_tiny_224px"
     saved = torch.load(run_dir / "best_seed0.pt", weights_only=False)
     assert saved["step"] == selected["step"] and "classifier.weight" in saved["head"]
 
@@ -65,3 +65,20 @@ def test_sweep_selects_one_setting_for_all_seeds(tiny_dataset, tmp_path, tiny_ba
     assert second["extraction"] is None
     assert second["curves"] == first["curves"]
     assert json.loads((run_dir / "summary.json").read_text(encoding="utf-8"))["selected"] == second["selected"]
+
+
+def test_larger_image_size_gives_finer_feature_map(tiny_dataset, tmp_path, tiny_backbone):
+    common = ["--dataset", "luad", "--backbone", "tiny", "--data-root", str(tiny_dataset),
+              "--cache-dir", str(tmp_path / "cache"), "--out-dir", str(tmp_path / "out"),
+              "--lrs", "0.001", "--max-steps", "2", "--eval-every", "1",
+              "--batch-size", "4", "--extract-batch-size", "2", "--workers", "0", "--seeds", "0"]
+
+    train_stage1_frozen.main(common + ["--image-size", "56"])
+    train_stage1_frozen.main(common + ["--image-size", "112"])
+
+    # Kare boyu 14 piksel: 56 piksel -> 4x4 kare, 112 piksel -> 8x8 kare. İki önbellek ayrı dosyalarda durur.
+    import numpy as np
+    small = np.load(tmp_path / "cache" / "luad_tiny_56px_training.npy")
+    large = np.load(tmp_path / "cache" / "luad_tiny_112px_training.npy")
+    assert small.shape == (8, 32, 4, 4) and large.shape == (8, 32, 8, 8)
+    assert (tmp_path / "out" / "luad_stage1_tiny_112px" / "summary.json").is_file()

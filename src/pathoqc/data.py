@@ -107,17 +107,30 @@ def build_train_transform() -> transforms.Compose:
     )
 
 
-def build_eval_transform(mean=IMAGENET_MEAN, std=IMAGENET_STD) -> transforms.Compose:
+def build_eval_transform(mean=IMAGENET_MEAN, std=IMAGENET_STD, image_size: int | None = None) -> transforms.Compose:
     """Ölçüm dönüşümü: rastgelelik yok, yalnızca tensöre çevirme + normalizasyon.
 
     Her omurga kendi eğitildiği renk ortalamasını ve sapmasını bekler; o yüzden parametredir.
+    `image_size` verilirse yama önce o boyuta büyütülür. Görüntüye yeni bilgi eklenmez; amaç
+    omurganın daha çok kareye bölmesi ve daha ince bir özellik haritası vermesidir
+    (224 piksel -> 16x16 kare, 448 piksel -> 32x32 kare).
     """
-    return transforms.Compose(
-        [
-            transforms.ToTensor(),
-            transforms.Normalize(mean, std),
-        ]
-    )
+    steps = []
+    if image_size is not None:
+        steps.append(transforms.Resize((image_size, image_size), interpolation=transforms.InterpolationMode.BICUBIC))
+    steps += [transforms.ToTensor(), transforms.Normalize(mean, std)]
+    return transforms.Compose(steps)
+
+
+def evenly_spaced(items: list, limit: int | None) -> list:
+    """Listeden eşit aralıklarla `limit` öğe seçer (limit yoksa ya da liste kısaysa hepsini döndürür).
+
+    Dosyalar ada göre sıralıdır ve ad hasta/slayt numarasıyla başlar. İlk N dosyayı almak yalnızca
+    birkaç slaytı seçerdi; eşit aralıklı seçim bütün slaytlardan örnek alır ve her çalıştırmada aynıdır.
+    """
+    if limit is None or limit >= len(items):
+        return list(items)
+    return [items[(i * len(items)) // limit] for i in range(limit)]
 
 
 class PatchLabelDataset(Dataset):
@@ -127,7 +140,7 @@ class PatchLabelDataset(Dataset):
     """
 
     def __init__(self, folder: Path, transform=None, limit: int | None = None):
-        self.paths = list_images(folder)[:limit]
+        self.paths = evenly_spaced(list_images(folder), limit)
         self.transform = transform or build_eval_transform()
         # Etiketleri baştan okuyup saklıyoruz: sınıf dengesizliğini hesaplamak için lazım.
         self.labels = torch.tensor([parse_label(p.name) for p in self.paths], dtype=torch.float32)
@@ -150,7 +163,7 @@ class MaskDataset(Dataset):
 
     def __init__(self, folder: Path, transform=None, limit: int | None = None):
         folder = Path(folder)
-        self.image_paths = list_images(folder / "img")[:limit]
+        self.image_paths = evenly_spaced(list_images(folder / "img"), limit)
         self.mask_dir = folder / "mask"
         self.transform = transform or build_eval_transform()
         missing = [p.name for p in self.image_paths if not (self.mask_dir / p.name).is_file()]

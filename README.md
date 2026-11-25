@@ -23,6 +23,7 @@ Bu yazılım araştırma amaçlıdır. **Tanı koymaz**, klinik kararda kullanı
 |---|---|---|---|
 | ResNet-50 (ImageNet, ince ayarlı) | 69,36 | 60,43 | tek seed (0), 10 epoch |
 | Midnight (dondurulmuş) + doğrusal baş, ilk ayar | 67,23 ± 1,04 | - | 3 seed; en iyi nokta 1. epoch'ta, eğitim uzadıkça %50'ye düştü |
+| Midnight (dondurulmuş) + doğrusal baş, ayar taraması | 68,66 ± 0,42 | - | 3 seed; öğrenme hızı 0,0003, 350 adım; lenfosit %62,8 ile en zayıf sınıf |
 
 Test kümelerine henüz dokunulmadı.
 

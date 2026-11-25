@@ -1,7 +1,7 @@
 import pytest
 import torch
 
-from pathoqc.data import MaskDataset, PatchLabelDataset, parse_label
+from pathoqc.data import MaskDataset, PatchLabelDataset, build_eval_transform, evenly_spaced, parse_label
 
 
 def test_parse_label_luad_format():
@@ -41,3 +41,26 @@ def test_mask_dataset_fails_when_mask_missing(tiny_dataset):
     (tiny_dataset / "LUAD-HistoSeg" / "val" / "mask" / "v0.png").rename(tiny_dataset / "v0.png")
     with pytest.raises(FileNotFoundError):
         MaskDataset(tiny_dataset / "LUAD-HistoSeg" / "val")
+
+
+def test_evenly_spaced_covers_whole_list():
+    assert evenly_spaced(list(range(10)), 5) == [0, 2, 4, 6, 8]
+    assert evenly_spaced(list(range(10)), 3) == [0, 3, 6]
+    assert evenly_spaced(list(range(4)), None) == [0, 1, 2, 3]
+    assert evenly_spaced(list(range(4)), 9) == [0, 1, 2, 3]
+
+
+def test_limit_takes_patches_from_across_the_folder(tiny_dataset):
+    dataset = PatchLabelDataset(tiny_dataset / "LUAD-HistoSeg" / "training", limit=4)
+    assert [path.stem.split("-")[0] for path in dataset.paths] == ["p0", "p2", "p4", "p6"]
+    assert dataset.labels.shape == (4, 4)
+
+
+def test_eval_transform_can_enlarge_the_patch(tiny_dataset):
+    transform = build_eval_transform((0.5, 0.5, 0.5), (0.5, 0.5, 0.5), image_size=128)
+    dataset = PatchLabelDataset(tiny_dataset / "LUAD-HistoSeg" / "training", transform)
+    assert dataset[0][0].shape == (3, 128, 128)
+    # Maske büyütülmez: ölçüm her zaman özgün boyutta yapılır.
+    masks = MaskDataset(tiny_dataset / "LUAD-HistoSeg" / "val", transform)
+    image, mask, _ = masks[0]
+    assert image.shape == (3, 128, 128) and mask.shape == (64, 64)

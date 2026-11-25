@@ -49,9 +49,11 @@ def parse_args(argv=None) -> argparse.Namespace:
     parser.add_argument("--max-steps", type=int, default=600, help="Her koşuda en fazla kaç adım eğitilecek")
     parser.add_argument("--eval-every", type=int, default=50, help="Kaç adımda bir doğrulama ölçümü yapılacak")
     parser.add_argument("--batch-size", type=int, default=64)
+    parser.add_argument("--image-size", type=int, default=224, help="Yama omurgaya verilmeden önce bu boyuta getirilir (224 = olduğu gibi)")
+    parser.add_argument("--extract-batch-size", type=int, default=64, help="Özellik çıkarırken grup boyutu; büyük görüntüde belleğe sığması için küçültülür")
     parser.add_argument("--seeds", type=int, nargs="+", default=[0, 1, 2])
     parser.add_argument("--workers", type=int, default=4)
-    parser.add_argument("--limit", type=int, default=None, help="Her kümeden ilk N yamayı kullan (yalnızca hızlı deneme için)")
+    parser.add_argument("--limit", type=int, default=None, help="Her kümeden eşit aralıklı N yama kullan (hızlı deneme için)")
     return parser.parse_args(argv)
 
 
@@ -145,23 +147,23 @@ def main(argv=None) -> dict:
     spec = backbones.FROZEN_BACKBONES[args.backbone]
     info = DATASETS[args.dataset]
     root = args.data_root / info.folder
-    run_dir = args.out_dir / f"{args.dataset}_stage1_{args.backbone}"
+    run_dir = args.out_dir / f"{args.dataset}_stage1_{args.backbone}_{args.image_size}px"
     run_dir.mkdir(parents=True, exist_ok=True)
 
     # Rastgele çevirme yok: özellikler bir kez hesaplanıp saklandığı için her yamanın tek hali vardır.
-    transform = build_eval_transform(spec.mean, spec.std)
+    transform = build_eval_transform(spec.mean, spec.std, None if args.image_size == 224 else args.image_size)
     train_set = PatchLabelDataset(root / "training", transform, limit=args.limit)
     val_set = MaskDataset(root / "val", transform, limit=args.limit)
 
-    tag = f"{args.dataset}_{args.backbone}" + (f"_limit{args.limit}" if args.limit else "")
+    tag = f"{args.dataset}_{args.backbone}_{args.image_size}px" + (f"_limit{args.limit}" if args.limit else "")
     train_path = args.cache_dir / f"{tag}_training.npy"
     val_path = args.cache_dir / f"{tag}_val.npy"
     extraction = None
     if not (train_path.is_file() and val_path.is_file()):
         backbone = backbones.load_frozen_backbone(args.backbone)
         started = time.time()
-        extract_features(backbone, train_set, train_path, device, args.batch_size, args.workers)
-        extract_features(backbone, val_set, val_path, device, args.batch_size, args.workers)
+        extract_features(backbone, train_set, train_path, device, args.extract_batch_size, args.workers)
+        extract_features(backbone, val_set, val_path, device, args.extract_batch_size, args.workers)
         seconds = time.time() - started
         extraction = {"seconds": round(seconds, 1), "images_per_second": round((len(train_set) + len(val_set)) / seconds, 1)}
         print(json.dumps({"ozellik_cikarma": extraction}, ensure_ascii=False), flush=True)
